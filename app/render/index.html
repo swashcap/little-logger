@@ -7,6 +7,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
   <body>
-
+    <div id="app"></div>
+    <script>
+      (function() {
+        const script = document.createElement('script');
+        script.src = location.search
+          .split('&')
+          .find(i => i.indexOf('rootScript') > -1)
+          .split('=')[1];
+        document.getElementsByTagName('head')[0].appendChild(script);
+      }());
+    </script>
   </body>
 </html>

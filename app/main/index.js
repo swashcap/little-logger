@@ -36,7 +36,7 @@ function createWindow() {
   mainWindowState.manage(win);
 
   // and load the index.html of the app.
-  win.loadURL(`file://${__dirname}/../render/index.html`);
+  win.loadURL(`file://${__dirname}/../render/index.html?rootScript=index.js`);
 
   // Emitted when the window is closed.
   win.on('closed', () => {
