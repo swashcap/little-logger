@@ -1,5 +1,6 @@
 'use strict';
 
+const cloneDeep = require('lodash/cloneDeep');
 const difference = require('lodash/difference');
 const EventEmitter = require('events');
 const uniqueId = require('lodash/uniqueId');
@@ -173,7 +174,8 @@ class Dispatcher extends EventEmitter {
       worker.on(Worker.events.jobAddError, onJobAddError);
 
       jobItems.forEach(([id, workerId, job]) => {
-        worker.exec('addJob', id, job);
+        // Clone so worker doesn't mess with our job reference
+        worker.exec('addJob', id, cloneDeep(job));
       });
     });
   }

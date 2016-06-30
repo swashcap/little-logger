@@ -1,5 +1,6 @@
 'use strict';
 
+const cloneDeep = require('lodash/cloneDeep');
 const EchoJob = require('./echo-job');
 const EventEmitter = require('events');
 const FilterJob = require('./filter-job');
@@ -258,7 +259,9 @@ class Worker extends EventEmitter {
         if (jobState.isKilled) {
           this.emit(Worker.events.jobRunKilled, id);
         } else {
-          this.emit(Worker.events.jobRunDone, id, jobState.result);
+          // Clone so whatever is controlling worker doesn't alter the worker's
+          // result ref
+          this.emit(Worker.events.jobRunDone, id, cloneDeep(jobState.result));
         }
 
         return jobState;
