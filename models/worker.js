@@ -283,6 +283,7 @@ class Worker extends EventEmitter {
         this.addJob(...args);
         break;
       case 'destroy':
+        this.destroy();
         break;
       case 'initialize':
         this.initialize();

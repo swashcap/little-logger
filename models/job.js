@@ -53,6 +53,8 @@ class Job {
           // reject(this.getState());
         })
         .finally(() => {
+          this.isRunning = false;
+          
           /**
            * Catches Bluebird's cancelled Promise. See `this.runner.isCanceled`
            */

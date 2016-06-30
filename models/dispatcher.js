@@ -84,18 +84,12 @@ class Dispatcher extends EventEmitter {
    destroyWorker(workerId) {
      // TODO ensure this doesn't throw!
      const worker = this.getWorker(workerId);
-     const jobItems = this.jobQueue.filter(j => j[1] === workerId);
 
      return this.getWorkerJobIds(workerId)
        .then(jobIds => this.removeJobsFromWorker(workerId, jobIds))
        .then(() => {
          return new Promise((resolve, reject) => {
            function onDestroyed() {
-             // Should we call `removeJobsToWorker` or just do it?
-             jobItems.forEach(jobItem => {
-               jobItem.splice(1, 1, undefined);
-             });
-
              // TODO: Remove all worker listeners?
              worker.removeListener(Worker.events.destroyError, onError);
              resolve(workerId);
@@ -193,52 +187,56 @@ class Dispatcher extends EventEmitter {
    * error in removal.
    */
   removeJobsFromWorker(workerId, jobIds) {
-    const workerJobIds = this.getWorkerJobIds(workerId);
+    const jobQueue = this.jobQueue;
     const worker = this.getWorker(workerId);
 
-    const localJobIds = jobIds.filter(id => workerJobIds.indexOf(id) > -1);
+    return this.getWorkerJobIds(workerId)
+      .then(workerJobIds => {
+        const localJobIds = jobIds.filter(id => workerJobIds.indexOf(id) > -1);
 
-    if (localJobIds.length !== jobIds.length) {
-      return Promise.reject(
-        `Some job IDs are not registered with worker ${workerId}:
-        ${difference(jobIds, localJobIds).toString()}`
-      );
-    }
-
-    return new Promise((resolve, reject) => {
-      const jobQueue = this.jobQueue;
-
-      function onRemoved(jobId) {
-        jobIdIndex = localJobIds.indexOf(jobId);
-
-        // TODO: This mutation is repeated in the job adder. Decorate?
-        if (jobIdIndex > -1) {
-          // TODO: Make a job getter
-          // TODO: Error if job can't be found?
-          const job = jobQueue.find(j => j[0] === jobId);
-
-          job.splice(1, 1, undefined);
-          localJobIds.slice(jobIndex, 1);
-
-          if (!localJobIds.length) {
-            worker.removeListener(Worker.events.jobRemoved, onRemoved);
-            worker.removeListener(Worker.events.jobRemoveError, onError);
-            resolve(jobIds);
-          }
+        if (localJobIds.length !== jobIds.length) {
+          throw new Error(
+            `Some job IDs are not registered with worker ${workerId}:
+            ${difference(jobIds, localJobIds).toString()}`
+          );
         }
-      }
-      function onError(error) {
-        worker.removeListener(Worker.events.jobRemoved, onRemoved);
-        reject(error);
-      }
 
-      worker.on(Worker.events.jobRemoved, onRemoved);
-      worker.once(Worker.events.jobRemoveError, onError);
+        return localJobIds;
+      })
+      .then(localJobIds => {
+        return new Promise((resolve, reject) => {
+          function onRemoved(jobId) {
+            const jobIdIndex = localJobIds.indexOf(jobId);
 
-      jobIds.forEach(id => {
-        worker.exec('removeJob', id);
+            // TODO: This mutation is repeated in the job adder. Decorate?
+            if (jobIdIndex > -1) {
+              // TODO: Make a job getter
+              // TODO: Error if job can't be found?
+              const job = jobQueue.find(j => j[0] === jobId);
+
+              job.splice(1, 1, undefined);
+              localJobIds.splice(jobIdIndex, 1);
+
+              if (!localJobIds.length) {
+                worker.removeListener(Worker.events.jobRemoved, onRemoved);
+                worker.removeListener(Worker.events.jobRemoveError, onError);
+                resolve(jobIds);
+              }
+            }
+          }
+          function onError(error) {
+            worker.removeListener(Worker.events.jobRemoved, onRemoved);
+            reject(error);
+          }
+
+          worker.on(Worker.events.jobRemoved, onRemoved);
+          worker.once(Worker.events.jobRemoveError, onError);
+
+          jobIds.forEach(id => {
+            worker.exec('removeJob', id);
+          });
+        });
       });
-    });
   }
 
   /**
@@ -328,6 +326,41 @@ class Dispatcher extends EventEmitter {
       });
     });
   }
+
+  /**
+   * Run some jobs.
+   *
+   * This creates a new worker, adds some jobs, runs them, and removes the jobs.
+   *
+   * @param {Job[]} jobs
+   * @returns {Promise} Resolves
+   */
+  runJobs(jobs) {
+    return Promise.all([this.addJobs(jobs), this.createWorker()])
+      .then(([jobIds, workerId]) => Promise.all([
+        this.addJobsToWorker(workerId, jobIds),
+        Promise.resolve(workerId),
+        Promise.resolve(jobIds)
+      ]))
+      .then(([, workerId, jobIds]) => Promise.all([
+        this.runAllWorkerJobs(workerId),
+        Promise.resolve(workerId),
+        Promise.resolve(jobIds),
+      ]))
+      .then(([results, workerId, jobIds]) => {
+        /**
+         * Do something interesting with the results here. Add them to an internal
+         * store or persist to a database?
+         *
+         * [].prototype.push(this.resultsQueue, zip(jobIds, results));
+         */
+        return Promise.all([
+          this.destroyWorker(workerId),
+          Promise.resolve(results),
+        ]);
+      })
+      .then(([, results]) => results);
+  };
 
   /**
    * Get a unique identifier for a worker.
