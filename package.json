@@ -1,0 +1,17 @@
+{
+  "name": "little-logger",
+  "version": "0.0.1",
+  "description": "A little logger app.",
+  "main": "index.js",
+  "dependencies": {
+    "async": "^2.0.0-rc.6",
+    "bluebird": "^3.4.1",
+    "lodash": "^4.13.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Cory Reed <swashcap@gmail.com>",
+  "license": "MIT"
+}
