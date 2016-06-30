@@ -1,7 +1,10 @@
 'use strict';
 
+const EchoJob = require('./echo-job');
 const EventEmitter = require('events');
-const Job = require('./job');
+const FilterJob = require('./filter-job');
+const GithubStatusJob = require('./github-status-job');
+const isPromise = require('../utils/is-promise');
 
 /**
  * Worker
@@ -142,7 +145,9 @@ class Worker extends EventEmitter {
    * model.
    *
    * @param {string} id Job ID to run
-   * @param {Object} Job
+   * @param {Object} job Definition of job
+   * @param {Array} job.args Arguments to pass to the job constructor
+   * @param {string} job.type Used for job class instantiation
    * @returns {Promise}
    */
   addJob(id, job) {
@@ -154,21 +159,49 @@ class Worker extends EventEmitter {
       error = new Error('Can\'t add job to destroyed worker');
     } else if (!id) {
       error = new Error('id required');
-    } else if (!job || !(job instanceof Job)) {
+    } else if (!job || !(job instanceof Object)) {
       error = new Error('job required');
     } else if (this.idInJobQueue(id)) {
       error = new Error(`ID ${id} already in job queue`);
+    } else if (Object.keys(Worker.jobTypes).indexOf(job.type) < 0) {
+      error = new Error(`Unknown job type: ${job.type}`);
+    } else if (job.args && !Array.isArray(job.args)) {
+      // Args _must_ be an array if passed
+      // TODO: Make it an array if not?
+      error = new Error('Args must be array');
     }
 
     if (error) {
       return this.emitAndReject(error, Worker.events.jobAddError)
     }
 
-    // A sequential queue could override this method
-    this.doAddJob(id, job);
-    this.emit(Worker.events.jobAdded, id);
+    const args = job.args;
+    const type = job.type;
+    const JobModel = Worker.jobTypes[type];
+    const add = (id, job) => {
+      // A sequential queue could override this method
+      this.doAddJob(id, job);
+      this.emit(Worker.events.jobAdded, id);
 
-    return Promise.resolve(id);
+      return id;
+    }
+
+    if ('factory' in JobModel) {
+      // TODO: What if `factory` throws?
+      const factoryResponse = JobModel.factory(args);
+
+      return isPromise(factoryResponse) ?
+        factoryResponse.then(job => add(id, job)) :
+        Promise.resolve(add(id, factoryResponse));
+    }
+
+    try {
+      const job = args ? new JobModel(...args) : new JobModel();
+      return Promise.resolve(add(id, job));
+    } catch (error) {
+      this.emit(Worker.events.jobAddError, error);
+      return Promise.reject(error);
+    }
   }
 
   /**
@@ -302,6 +335,11 @@ class Worker extends EventEmitter {
   }
 }
 
+/**
+ * Worker events.
+ *
+ * @const {Object}
+ */
 Worker.events = {
   destroyed: 'destroyed',
   destroyError: 'destroy:error',
@@ -314,6 +352,19 @@ Worker.events = {
   jobRunError: 'job:run:error',
   jobRunKilled: 'job:run:killed',
   ready: 'ready',
+};
+
+/**
+ * Job types.
+ *
+ * Hash of 'type' strings to job classes. Add new job types here.
+ *
+ * @const {Object}
+ */
+Worker.jobTypes = {
+  echo: EchoJob,
+  filter: FilterJob,
+  githubStatus: GithubStatusJob,
 };
 
 module.exports = Worker;

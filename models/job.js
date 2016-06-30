@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * Job
+ * @abstract
+ *
+ */
 class Job {
   constructor() {
     this.error = null;
@@ -54,7 +59,7 @@ class Job {
         })
         .finally(() => {
           this.isRunning = false;
-          
+
           /**
            * Catches Bluebird's cancelled Promise. See `this.runner.isCanceled`
            */
