@@ -7,7 +7,7 @@ module.exports = function configureStore(preloadedState) {
   const store = createStore(
     rootReducer,
     preloadedState,
-    applyMiddleware(thunk, createLogger())
+    applyMiddleware(thunk, createLogger({ collapsed: true }))
   );
 
   // Just copy redux's example

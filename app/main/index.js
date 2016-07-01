@@ -1,15 +1,19 @@
+'use strict';
+
 const electron = require('electron');
-// Module to control application life.
-const {app} = electron;
-// Module to create native browser window.
-const {BrowserWindow} = electron;
+const electronDebug = require('electron-debug');
 const windowStateKeeper = require('electron-window-state');
+
+const { app, BrowserWindow } = electron;
+
+/** Load up IPC event handling for main process */
+const ipc = require('./ipc/index');
 
 /**
  * Handy debugging. Only runs in development.
  * {@link https://github.com/sindresorhus/electron-debug}
  */
-require('electron-debug')({ showDevTools: true });
+electronDebug({ showDevTools: true });
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -36,7 +40,7 @@ function createWindow() {
   mainWindowState.manage(win);
 
   // and load the index.html of the app.
-  win.loadURL(`file://${__dirname}/../render/index.html?rootScript=index.js`);
+  win.loadURL(`file://${__dirname}/../../.tmp/index.html?rootScript=index.js`);
 
   // Emitted when the window is closed.
   win.on('closed', () => {

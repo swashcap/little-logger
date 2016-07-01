@@ -6,6 +6,7 @@
   "dependencies": {
     "async": "^2.0.0-rc.6",
     "bluebird": "^3.4.1",
+    "classnames": "^2.2.5",
     "electron-debug": "^1.0.1",
     "electron-prebuilt": "^1.2.5",
     "electron-window-state": "^3.0.3",
@@ -23,10 +24,16 @@
     "superagent": "^2.0.0"
   },
   "devDependencies": {
+    "babel-cli": "^6.10.1",
+    "babel-preset-react": "^6.11.1",
     "devtron": "^1.2.1"
   },
   "scripts": {
-    "start": "electron .",
+    "babel": "babel app/render/ -d .tmp",
+    "babel:watch": "babel --skip-initial-build -w app/render/ -d .tmp",
+    "build": "npm run clean && babel app/render/ -d .tmp && cp app/render/*.html .tmp",
+    "clean": "rm -rf .tmp",
+    "start": "npm run build && parallelshell 'npm run babel:watch' 'electron .'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Cory Reed <swashcap@gmail.com>",
